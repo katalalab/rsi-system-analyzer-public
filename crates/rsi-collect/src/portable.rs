@@ -99,9 +99,12 @@ fn optional_observation(value: Option<String>, captured_at: DateTime<Utc>) -> Ob
 }
 
 fn safe_basename(name: &OsStr) -> String {
-    let name = name.to_string_lossy();
-    let basename = name.rsplit(['/', '\\']).next().unwrap_or("unknown");
-    sanitize_metadata_text(basename).replace(':', "_")
+    let sanitized = sanitize_metadata_text(&name.to_string_lossy());
+    let basename = sanitized
+        .rsplit(['/', '\\'])
+        .find(|component| !component.is_empty())
+        .unwrap_or("unknown");
+    basename.replace(':', "_")
 }
 
 fn categorize(name: &OsStr) -> String {
@@ -145,6 +148,18 @@ mod tests {
             assert!(!sanitized.contains(['/', '\\', ':']));
         }
         assert_eq!(safe_basename(OsStr::new("plain-worker")), "plain-worker");
+    }
+
+    #[test]
+    fn process_basename_preserves_redaction_context_and_empty_fallback() {
+        assert_eq!(
+            safe_basename(OsStr::new("token=a\\sensitive-fixture")),
+            "[redacted-credential]"
+        );
+        for name in ["", "/", "\\"] {
+            assert_eq!(safe_basename(OsStr::new(name)), "unknown");
+        }
+        assert_eq!(safe_basename(OsStr::new("folder/worker/")), "worker");
     }
 
     #[test]
