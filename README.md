@@ -55,14 +55,30 @@ strings. A remote node must already have `rsi-scan` on its executable path.
 
 ## Development verification
 
+After the locked dependencies are available, run the offline library checks:
+
 ```text
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
+cargo fmt --all --check
+cargo test --offline --locked --workspace --lib
+```
+
+These checks include synthetic process-name fixtures. The collector removes
+path separators and normalizes colons before a process name reaches the
+snapshot. The verifier still rejects path-like names.
+
+Run the full verification in a disposable development or CI environment:
+
+```text
+cargo fmt --all --check
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all
 pwsh -NoProfile -File scripts/check-read-only-boundary.ps1
 ```
 
-CI runs the same checks on Windows, macOS, and Ubuntu.
+The full suite collects local machine facts, probes installed tools, and reads
+local MCP metadata. Keep generated snapshots out of commits. On Unix, the
+boundary check is `bash scripts/check-read-only-boundary.sh`. CI runs full
+verification on Windows, macOS, and Ubuntu.
 
 ## Architecture
 
