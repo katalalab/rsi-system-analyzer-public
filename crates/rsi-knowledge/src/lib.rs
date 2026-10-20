@@ -273,7 +273,7 @@ fn fetch_source(
     if body.len() > source.max_bytes {
         return Err(KnowledgeError::BodyLimit);
     }
-    let sha256 = format!("{:x}", Sha256::digest(&body));
+    let sha256 = document_hash(&body);
     let file_name = format!("{sha256}.document");
     let cache_file = cache_dir.join(&file_name);
     write_content_addressed(&cache_file, &body)?;
@@ -288,6 +288,13 @@ fn fetch_source(
         byte_count: body.len(),
         cache_file: file_name,
     })
+}
+
+fn document_hash(body: &[u8]) -> String {
+    Sha256::digest(body)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn write_content_addressed(path: &PathBuf, body: &[u8]) -> Result<(), KnowledgeError> {
@@ -318,6 +325,18 @@ fn write_content_addressed(path: &PathBuf, body: &[u8]) -> Result<(), KnowledgeE
 mod tests {
     use super::{KnowledgeError, official_sources, select_sources, write_content_addressed};
     use std::collections::BTreeSet;
+
+    #[test]
+    fn document_hash_preserves_lowercase_zero_padded_sha256() {
+        assert_eq!(
+            super::document_hash(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            super::document_hash(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
 
     #[test]
     fn registry_is_https_unique_and_bounded() {

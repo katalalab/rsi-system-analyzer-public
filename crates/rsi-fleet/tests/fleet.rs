@@ -56,7 +56,7 @@ fn fleet_output_uses_stable_public_labels_not_ssh_aliases() {
     });
     let json = serde_json::to_string(&bundle).unwrap();
     assert!(!json.contains("fixture-node"));
-    assert!(json.contains("node-"));
+    assert!(json.contains("node-748dd8681526"));
 }
 
 #[test]

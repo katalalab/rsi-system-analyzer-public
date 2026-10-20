@@ -167,6 +167,9 @@ fn node_alias(node: &NodeResult) -> &str {
 }
 
 fn public_alias(alias: &str) -> String {
-    let digest = format!("{:x}", Sha256::digest(alias.as_bytes()));
+    let digest: String = Sha256::digest(alias.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     format!("node-{}", &digest[..12])
 }
