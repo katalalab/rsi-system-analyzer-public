@@ -260,7 +260,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn timeout_terminates_descendant_process_tree() {
+    fn timeout_terminates_descendant_process_tree() -> Result<(), &'static str> {
         let directory = tempfile::tempdir().unwrap();
         let pid_file = directory.path().join("descendant.pid");
         let pid_path = pid_file.to_str().unwrap();
@@ -274,12 +274,12 @@ mod tests {
         );
         assert_eq!(result, Err(ProbeError::Timeout { limit_ms: 250 }));
         assert!(started.elapsed() < Duration::from_secs(5));
-        assert_process_terminated(&pid_file);
+        assert_process_terminated(&pid_file)
     }
 
     #[cfg(unix)]
     #[test]
-    fn parent_exit_pipe_holder_is_killed() {
+    fn parent_exit_pipe_holder_is_killed() -> Result<(), &'static str> {
         let directory = tempfile::tempdir().unwrap();
         let pid_file = directory.path().join("pipe-holder.pid");
         let pid_path = pid_file.to_str().unwrap();
@@ -291,7 +291,7 @@ mod tests {
             true,
         );
         assert_eq!(result, Err(ProbeError::Timeout { limit_ms: 250 }));
-        assert_process_terminated(&pid_file);
+        assert_process_terminated(&pid_file)
     }
 
     // PowerShell has to cold-start, launch a second PowerShell and write the child's id
@@ -305,7 +305,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn timeout_terminates_descendant_process_tree() {
+    fn timeout_terminates_descendant_process_tree() -> Result<(), &'static str> {
         let directory = tempfile::tempdir().unwrap();
         let pid_file = directory.path().join("descendant.pid");
         let pid_path = pid_file.to_string_lossy().replace('\'', "''");
@@ -332,12 +332,12 @@ mod tests {
         );
         // Still a promptness check: the kill must follow the deadline, not trail it.
         assert!(started.elapsed() < Duration::from_millis(WINDOWS_SETUP_BUDGET_MS + 5_000));
-        assert_process_terminated(&pid_file);
+        assert_process_terminated(&pid_file)
     }
 
     #[cfg(windows)]
     #[test]
-    fn parent_exit_pipe_holder_is_killed() {
+    fn parent_exit_pipe_holder_is_killed() -> Result<(), &'static str> {
         let directory = tempfile::tempdir().unwrap();
         let pid_file = directory.path().join("pipe-holder.pid");
         let pid_path = pid_file.to_string_lossy().replace('\'', "''");
@@ -360,10 +360,10 @@ mod tests {
                 limit_ms: WINDOWS_SETUP_BUDGET_MS
             })
         );
-        assert_process_terminated(&pid_file);
+        assert_process_terminated(&pid_file)
     }
 
-    fn assert_process_terminated(pid_file: &std::path::Path) {
+    fn assert_process_terminated(pid_file: &std::path::Path) -> Result<(), &'static str> {
         // A missing file means the script never reached the line that writes it, so the
         // run proved nothing about termination. Say that, rather than panicking on unwrap.
         let pid = fs::read_to_string(pid_file)
@@ -372,11 +372,15 @@ mod tests {
             .parse::<u32>()
             .unwrap();
         thread::sleep(Duration::from_millis(200));
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::All, true);
+        let mut system = System::new().map_err(
+            |_| "sysinfo initialization failed; descendant termination could not be verified",
+        )?;
+        let pid = Pid::from_u32(pid);
+        system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
         assert!(
-            system.process(Pid::from_u32(pid)).is_none(),
+            system.process(pid).is_none(),
             "descendant process {pid} survived group termination"
         );
+        Ok(())
     }
 }
